@@ -1,0 +1,256 @@
+
+```{r}
+install.packages("rlang")
+```
+
+```{r}
+# w  install.packages("tidyverse")
+library(tidyverse)
+library(dplyr) 
+library(ggplot2)
+data1 <- read.csv("C:/Users/Others/Desktop/updated data.csv") 
+head(data1)
+```
+
+
+```{r}
+summary(data1)
+```
+Data Preprocessing
+
+```{r}
+data2 <- data1 %>%
+mutate(exang = if_else(exang == 1, "YES" ,"NO"), cp = if_else(cp == 1, "ATYPICAL ANGINA",
+if_else(cp == 2, "NON-ANGINAL PAIN", "ASYMPTOMATIC")),
+restecg = if_else(restecg == 0, "NORMAL",
+if_else(restecg == 1, "ABNORMALITY", "PROBABLE OR
+DEFINITE")),
+slope = as.factor(slope), ca = as.factor(ca),
+thal = as.factor(thal),
+target = if_else(target == 0, "NO",
+                if_else(target == 1, "YES","YES")),
+) %>%
+mutate_if(is.character, as.factor) %>%
+dplyr::select(target, sex, trestbps, exang, cp, restecg, slope, ca, thal,everything())
+
+head(data2)
+
+```
+Data Exploration
+```{r}
+ggplot(data2, aes(x=data2$target, fill=data2$target))+ geom_bar()+
+xlab("Heart Disease")+ ylab("count")+
+ggtitle("Presence & Absence of Heart Disease")+
+scale_fill_discrete(name= 'Heart Disease', labels =c("Absence", "Presence"
+))
+
+```
+
+Frequency of values of age
+```{r}
+data2 %>%
+group_by(age) %>% count() %>% filter(n > 10) %>% ggplot() +
+geom_col(aes(age, n), fill = 'orange') + ggtitle("Age Analysis")+
+xlab("Age")+ ylab("Age Count")
+
+```
+By observing the graph we can say that the dataset contains more people who are in the range of age 55 to 60.
+
+Compare blood pressure across the chest pain
+
+```{r}
+data2 %>%
+ggplot(aes(x=sex, y=trestbps)) + geom_boxplot(fill = 'green') + xlab("Sex") +
+ylab("Blood Pressure") + facet_grid(~cp)
+
+```
+From above graph we can say that Females are experiencing highest blood pressure when they are having Asympomatic chest pain.
+```{r}
+data2 %>%
+ggplot(aes(x=sex, y=chol)) + geom_boxplot(fill = 'orange') + xlab("Gender") + ylab("Cholesterol") + facet_grid(~cp)
+```
+From above graph we can say that Females are experiencing high Cholestrol levels when they are having Asympomatic chest pain.
+
+```{r}
+data2 %>%
+ggplot(aes(x=sex, y=trestbps))+ geom_boxplot(fill ='purple')+ xlab('sex')+
+ylab('BP')+ facet_grid(~cp)
+
+```
+
+```{r}
+data2 %>%
+ggplot(aes(x=sex, y=chol))+ geom_boxplot(fill ='orange')+ xlab('sex')+
+ylab('Chol')+ facet_grid(~cp)
+
+```
+## Correlation
+
+```{r}
+library(corrplot)
+```
+```{r}
+cor_heart <- cor(data2[, 10:14]) 
+cor_heart
+```
+```{r}
+corrplot(cor_heart, method ='square', type='upper')
+```
+Checking the null values in the dataset.
+
+```{r}
+is.null(data2)
+```
+```{r}
+library(lattice) 
+library(caret)
+```
+
+Now let us divide the data in the test and train set.
+In this project, I have divided the data into an 70: 30 ratio. That is, the training size is 70% and testing size is 30% of the whole data.
+
+
+```{r}
+set.seed(10)
+inTrainRows <- createDataPartition(data2$target,p=0.7,list=FALSE)
+trainData <- data2[inTrainRows,] 
+testData <- data2[-inTrainRows,]
+nrow(trainData)/(nrow(testData)+nrow(trainData))
+
+```
+Classifier
+
+a) SVM model
+Using the Cross Validation method for Classification.
+
+```{r}
+install.packages("kernlab")
+```
+
+```{r}
+grid <- expand.grid(C = 10^seq(-5,2,0.5))
+train_control = trainControl(method = "cv", number = 10)
+svm_grid <- train(target ~., data = trainData, method = "svmLinear", trControl = train_control, tuneGrid = grid)
+svm_grid
+
+```
+Confusion Matrix to predict the accuracy of SVM
+
+```{r}
+pred_tree1 <- predict(svm_grid, testData) 
+confusionMatrix(testData$target, pred_tree1)
+```
+
+Using the classifier of Decision tree to classify the data.
+```{r}
+library(bitops)
+library(rattle)
+library(rpart)
+```
+
+   
+
+```{r}
+train_control = trainControl(method = "cv", number = 10) 
+hypers = rpart.control(minsplit = 12, maxdepth = 7,minbucket = 10)
+
+tree1 <- train(target~ .,control = hypers, data = trainData,method = "rpart1SE",trControl = train_control)
+tree1
+
+```
+
+Getting errors in decison tree. I have to check again
+
+Clustering
+
+Creating dummy variables
+
+```{r}
+heart_norm<- data2 %>% select(-c(target))
+preprocess <- preProcess(heart_norm, method=c("center","scale")) 
+norm <- predict(preprocess, heart_norm)
+summary(norm)
+
+```
+```{r}
+heart_norm$class<-data2$class
+```
+
+```{r}
+norm_dummy <- dummyVars(~ ., data = norm)
+norm_dummies <- as.data.frame(predict(norm_dummy, newdata = norm)) 
+head(norm_dummies)
+
+```
+```{r}
+heart_dummies <- as.data.frame(norm_dummies) 
+heart_dummies <- na.omit(heart_dummies) 
+head(heart_dummies)
+```
+```{r}
+library(caret)
+library(ggplot2)
+```
+
+
+
+
+
+```{r}
+#install.packages("factoextra")
+#install.packages("caret")
+#install.packages("ggplot2")
+#library(caret)
+update.packages("ggplot2")
+update.packages("caret")
+library(ggplot2)
+library(caret)
+library(factoextra)
+library(cluster)
+library(lattice)
+set.seed(13)
+heart2<-heart_dummies
+preprocess<-preProcess(heart2,method=c("center","scale")) 
+pred<-predict(preprocess,heart2)
+
+```
+
+finding optimal no.of clusters
+```{r}
+fviz_nbclust(heart2, kmeans, method = "wss")
+```
+
+```{r}
+fviz_nbclust(heart2, kmeans, method = "silhouette")
+```
+```{r}
+gap_stat <- clusGap(heart2,FUN = kmeans, nstart = 25,K.max = 10,B = 50)
+
+```
+```{r}
+fviz_gap_stat(gap_stat)
+```
+Choosing K=3
+
+```{r}
+km <- kmeans(heart2, centers = 3, nstart = 25) 
+km
+```
+
+Visualizing the cluster
+
+```{r}
+fviz_cluster(km, data = heart2)
+```
+```{r}
+# Calculate PCA 
+pca = prcomp(pred) 
+# Save as dataframe
+rotated_data = as.data.frame(pca$x)
+# Add original labels as a reference 
+rotated_data$Clusters = as.factor(km$cluster) # Plot and color by labels
+ggplot(data = rotated_data, aes(x = PC2, y = PC1, col = Clusters)) + geom_point()
+
+
+```
+
